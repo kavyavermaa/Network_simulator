@@ -1,25 +1,61 @@
+#simulator.py
+
 import networkx as nx
 import matplotlib.pyplot as plt
 from src.physical_layer import EndDevice, Hub, Connection
 from src.data_link_layer import Switch, Device, parity_check, csma_cd, sliding_window
 
+# Visualization function for network topology
 def visualize_network(devices, connections, title="Network Topology"):
     G = nx.Graph()
 
+    # Define shapes for different devices and their colors
+    node_styles = {}
     for device in devices:
-        color = "blue" if isinstance(device, EndDevice) else "red" if isinstance(device, Switch) else "green"
-        G.add_node(device.name, color=color)
+        # Color nodes differently based on device type
+        if isinstance(device, EndDevice):
+            node_styles[device.name] = {"color": "blue", "shape": "o"}  # Circle for EndDevice
+        elif isinstance(device, Switch):
+            node_styles[device.name] = {"color": "red", "shape": "s"}  # Square for Switch
+        elif isinstance(device, Hub):
+            node_styles[device.name] = {"color": "green", "shape": "p"}  # Pentagon for Hub
+
+    # Add nodes and edges to the graph
+    for device in devices:
+        G.add_node(device.name, color=node_styles[device.name]["color"], shape=node_styles[device.name]["shape"])
 
     for conn in connections:
         G.add_edge(conn[0].name, conn[1].name)
 
+    # Assign node colors based on the device type (as defined earlier)
     colors = [G.nodes[n].get("color", "gray") for n in G.nodes]
 
-    plt.figure(figsize=(8, 6))
-    nx.draw(G, with_labels=True, node_color=colors, node_size=2000, font_size=10, edge_color="gray")
-    plt.title(title)
+    # Create the plot
+    plt.figure(figsize=(10, 8))
+
+    # Create a custom layout for more Cisco-like diagram positioning
+    pos = nx.spring_layout(G, seed=42)
+
+    # Draw the nodes with specific shapes for each device
+    for node, style in node_styles.items():
+        nx.draw_networkx_nodes(G, pos, nodelist=[node], node_size=4000, node_color=style["color"], 
+                               node_shape=style["shape"])
+
+    # Draw edges (connections)
+    nx.draw_networkx_edges(G, pos, edgelist=G.edges(), width=2, alpha=0.5, edge_color="gray")
+
+    # Draw node labels
+    nx.draw_networkx_labels(G, pos, font_size=12, font_weight="bold", font_family="sans-serif", 
+                            font_color="white")
+
+    # Add title and other settings to make it more like a Cisco diagram
+    plt.title(title, fontsize=16, fontweight="bold")
+    plt.axis('off')  # Turn off axis for cleaner look
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.3)
+
+    # Show the plot in a non-blocking manner and then pause and close it
     plt.show(block=False)  # Non-blocking display
-    plt.pause(5)  # Pause for 2 seconds
+    plt.pause(5)  # Pause for 5 seconds
     plt.close()  # Close the figure to allow the next one to appear
 
 def test_physical_layer():
@@ -76,7 +112,6 @@ def test_data_link_layer():
     except Exception as e:
         print(f"Error during Data Link Layer testing: {e}")
 
-
 def test_extended_network():
     print("\n--- Testing Extended Network with Two Star Topologies ---")
 
@@ -110,16 +145,11 @@ def test_extended_network():
         "Extended Network: Two Star Topologies with Switch"
     )
 
-
 def main():
-        test_physical_layer()
-        test_data_link_layer()
-        print("Proceeding to Extended Network Test...")
-        test_extended_network()
-    
-
+    test_physical_layer()
+    test_data_link_layer()
+    print("Proceeding to Extended Network Test...")
+    test_extended_network()
 
 if __name__ == "__main__":
     main()
-
-
