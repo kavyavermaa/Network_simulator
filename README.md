@@ -14,7 +14,7 @@ Testing & Simulation
 
 Network Visualization
 
-How to Run the Project
+How to Run the Project and see simulations
 
 Conclusion
 

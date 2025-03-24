@@ -1,3 +1,5 @@
+#simulator.py
+
 import networkx as nx
 import matplotlib.pyplot as plt
 from src.physical_layer import EndDevice, Hub, Connection
