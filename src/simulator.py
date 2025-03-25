@@ -1,59 +1,41 @@
-#simulator.py
-
 import networkx as nx
 import matplotlib.pyplot as plt
 from src.physical_layer import EndDevice, Hub, Connection
 from src.data_link_layer import Switch, Device, parity_check, csma_cd, sliding_window
 
-# Visualization function for network topology
 def visualize_network(devices, connections, title="Network Topology"):
     G = nx.Graph()
 
-    # Define shapes for different devices and their colors
-    node_styles = {}
+    # Add nodes to the graph with different colors and shapes based on device type
     for device in devices:
-        # Color nodes differently based on device type
-        if isinstance(device, EndDevice):
-            node_styles[device.name] = {"color": "blue", "shape": "o"}  # Circle for EndDevice
-        elif isinstance(device, Switch):
-            node_styles[device.name] = {"color": "red", "shape": "s"}  # Square for Switch
-        elif isinstance(device, Hub):
-            node_styles[device.name] = {"color": "green", "shape": "p"}  # Pentagon for Hub
+        color = "blue" if isinstance(device, EndDevice) else "red" if isinstance(device, Switch) else "green"
+        node_shape = "o" if isinstance(device, EndDevice) else "s"  # circle for EndDevice, square for Switch
+        G.add_node(device.name, color=color, shape=node_shape)
 
-    # Add nodes and edges to the graph
-    for device in devices:
-        G.add_node(device.name, color=node_styles[device.name]["color"], shape=node_styles[device.name]["shape"])
-
+    # Add edges between connected devices
     for conn in connections:
         G.add_edge(conn[0].name, conn[1].name)
 
-    # Assign node colors based on the device type (as defined earlier)
+    # Assign colors to nodes based on their device type
     colors = [G.nodes[n].get("color", "gray") for n in G.nodes]
+    
+    # Determine node shapes based on device type
+    node_shapes = [G.nodes[n].get("shape", "o") for n in G.nodes]
 
-    # Create the plot
     plt.figure(figsize=(10, 8))
 
-    # Create a custom layout for more Cisco-like diagram positioning
-    pos = nx.spring_layout(G, seed=42)
+    # Customizing the layout and node styles
+    pos = nx.spring_layout(G, seed=42)  # Custom layout for better node spacing
 
-    # Draw the nodes with specific shapes for each device
-    for node, style in node_styles.items():
-        nx.draw_networkx_nodes(G, pos, nodelist=[node], node_size=4000, node_color=style["color"], 
-                               node_shape=style["shape"])
+    # Draw nodes and edges with distinct styles
+    nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=3000, alpha=0.7, edgecolors="black")
+    nx.draw_networkx_edges(G, pos, width=2, alpha=0.6, edge_color="gray")
+    nx.draw_networkx_labels(G, pos, font_size=12, font_weight="bold", font_color="white")
 
-    # Draw edges (connections)
-    nx.draw_networkx_edges(G, pos, edgelist=G.edges(), width=2, alpha=0.5, edge_color="gray")
+    # Displaying the title and visual elements
+    plt.title(title, fontsize=14, fontweight="bold")
+    plt.axis('off')  # Turn off the axis
 
-    # Draw node labels
-    nx.draw_networkx_labels(G, pos, font_size=12, font_weight="bold", font_family="sans-serif", 
-                            font_color="white")
-
-    # Add title and other settings to make it more like a Cisco diagram
-    plt.title(title, fontsize=16, fontweight="bold")
-    plt.axis('off')  # Turn off axis for cleaner look
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.3)
-
-    # Show the plot in a non-blocking manner and then pause and close it
     plt.show(block=False)  # Non-blocking display
     plt.pause(5)  # Pause for 5 seconds
     plt.close()  # Close the figure to allow the next one to appear
@@ -146,8 +128,6 @@ def test_extended_network():
     )
 
 def main():
-    test_physical_layer()
-    test_data_link_layer()
     print("Proceeding to Extended Network Test...")
     test_extended_network()
 
