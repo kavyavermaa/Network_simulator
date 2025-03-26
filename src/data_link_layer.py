@@ -38,7 +38,7 @@ class Bridge:
             for device in self.mac_table.values():
                 if device.mac_address != source_mac:
                     device.receive_data(data)
-
+                    
 class Device:
     def __init__(self, name, mac_address):
         self.name = name
