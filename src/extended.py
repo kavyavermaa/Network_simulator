@@ -77,7 +77,7 @@ def test_extended_network():
 
     # Calculate and report broadcast and collision domains
     broadcast_domains = 1  # One for each hub, plus switch creates a larger broadcast domain
-    collision_domains = 2 + len(devices1) + len(devices2)  # One for each switch
+    collision_domains = 2  # One for each switch
 
     print(f"\nTotal Broadcast Domains: {broadcast_domains}")
     print(f"Total Collision Domains: {collision_domains}")
