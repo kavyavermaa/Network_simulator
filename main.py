@@ -1,4 +1,3 @@
-# main.py
 from src.simulator import test_physical_layer, test_data_link_layer
 from src.extended import test_extended_network
 

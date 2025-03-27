@@ -37,7 +37,7 @@ def visualize_network(devices, connections, title="Network Topology"):
     plt.axis('off')  # Turn off the axis
 
     plt.show(block=False)  # Non-blocking display
-    plt.pause(5)  # Pause for 5 seconds
+    plt.pause(10)  # Pause for 10 seconds
     plt.close()  # Close the figure to allow the next one to appear
 
 def test_physical_layer():

@@ -89,8 +89,8 @@ def test_extended_network():
         device.send_data(switch, devices1[0].mac_address, f"Data from {device.name}")
 
     # Calculate and report broadcast and collision domains
-    broadcast_domains = 2  # One for each hub, plus switch creates a larger broadcast domain
-    collision_domains = 2 + len(devices1) + len(devices2)  # One for each hub and each end device connected to a switch
+    broadcast_domains = 1  # One for each hub, plus switch creates a larger broadcast domain
+    collision_domains = 2   # One for each hub and each end device connected to a switch
     
     # Simulate CSMA/CD communication
     print("\n--- Simulating CSMA/CD Communication ---")
