@@ -230,6 +230,117 @@ def test_network_layer():
 def test_dynamic_routing():
     print("\n--- Testing Dynamic Routing (RIP) ---")
     network = Network()
+
+    # Create routers
+    router1 = Router("Router1")
+    router2 = Router("Router2")
+    router3 = Router("Router3")
+    router4 = Router("Router4")
+
+    network.add_device(router1)
+    network.add_device(router2)
+    network.add_device(router3)
+    network.add_device(router4)
+
+    # Create hosts
+    host1 = NetworkDevice("Host1", "AA:BB:CC:11:11:11")
+    host2 = NetworkDevice("Host2", "AA:BB:CC:22:22:22")
+
+    network.add_device(host1)
+    network.add_device(host2)
+
+    # Configure router interfaces
+    router1.add_interface("eth0", "10.0.1.1/24", "AA:BB:CC:01:01:01")
+    router1.add_interface("eth1", "10.0.12.1/24", "AA:BB:CC:01:01:02")
+    router1.add_interface("eth2", "10.0.13.1/24", "AA:BB:CC:01:01:03")
+
+    router2.add_interface("eth0", "10.0.12.2/24", "AA:BB:CC:02:02:01")
+    router2.add_interface("eth1", "10.0.2.1/24", "AA:BB:CC:02:02:02")
+    router2.add_interface("eth2", "10.0.24.1/24", "AA:BB:CC:02:02:03")
+
+    router3.add_interface("eth0", "10.0.13.3/24", "AA:BB:CC:03:03:01")
+    router3.add_interface("eth1", "10.0.3.1/24", "AA:BB:CC:03:03:02")
+    router3.add_interface("eth2", "10.0.34.1/24", "AA:BB:CC:03:03:03")
+
+    router4.add_interface("eth0", "10.0.24.4/24", "AA:BB:CC:04:04:01")
+    router4.add_interface("eth1", "10.0.34.4/24", "AA:BB:CC:04:04:02")
+    router4.add_interface("eth2", "10.0.4.1/24", "AA:BB:CC:04:04:03")
+
+    # Configure hosts
+    host1.set_ip("10.0.1.10/24", "10.0.1.1")
+    host2.set_ip("10.0.4.10/24", "10.0.4.1")
+
+    # Connect devices to routers
+    router1.connect_device("eth0", host1)
+    router1.connect_device("eth1", router2)
+    router1.connect_device("eth2", router3)
+
+    router2.connect_device("eth0", router1)
+    router2.connect_device("eth2", router4)
+
+    router3.connect_device("eth0", router1)
+    router3.connect_device("eth2", router4)
+
+    router4.connect_device("eth0", router2)
+    router4.connect_device("eth1", router3)
+    router4.connect_device("eth2", host2)
+
+    # Initialize RIP on routers
+    rip1 = RIP(router1)
+    rip2 = RIP(router2)
+    rip3 = RIP(router3)
+    rip4 = RIP(router4)
+
+    # Start RIP
+    rip1.start(network)
+    rip2.start(network)
+    rip3.start(network)
+    rip4.start(network)
+
+    # Simulate route exchange
+    print("\n--- Round 1: Initial RIP Updates ---")
+    rip2.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
+    rip3.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
+
+    rip1.process_rip_update(router2.name, "10.0.2.0", "255.255.255.0", 1)
+    rip1.process_rip_update(router2.name, "10.0.24.0", "255.255.255.0", 1)
+
+    rip1.process_rip_update(router3.name, "10.0.3.0", "255.255.255.0", 1)
+    rip1.process_rip_update(router3.name, "10.0.34.0", "255.255.255.0", 1)
+
+    rip2.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
+    rip3.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
+
+    print("\n--- Round 2: Propagating Routes ---")
+    rip3.process_rip_update(router1.name, "10.0.2.0", "255.255.255.0", 2)
+    rip3.process_rip_update(router1.name, "10.0.24.0", "255.255.255.0", 2)
+
+    rip2.process_rip_update(router1.name, "10.0.3.0", "255.255.255.0", 2)
+    rip2.process_rip_update(router1.name, "10.0.34.0", "255.255.255.0", 2)
+
+    rip1.process_rip_update(router2.name, "10.0.4.0", "255.255.255.0", 2)
+    rip1.process_rip_update(router3.name, "10.0.4.0", "255.255.255.0", 2)
+
+    # Display routing tables
+    router1.print_routing_table()
+    router2.print_routing_table()
+    router3.print_routing_table()
+    router4.print_routing_table()
+
+    print("\n--- Testing Packet Forwarding with RIP ---")
+    host1.send_packet("10.0.4.10", "Hello from Host1 to Host2 via RIP routes", network)
+
+    # Visualization
+    devices = [router1, router2, router3, router4, host1, host2]
+    connections = [
+        (router1, host1), (router1, router2), (router1, router3),
+        (router2, router4), (router3, router4), (router4, host2)
+    ]
+    visualize_network(devices, connections, "Network Layer: RIP Dynamic Routing")
+    print("Network Layer RIP Dynamic Routing Test Completed")
+
+    print("\n--- Testing Dynamic Routing (RIP) ---")
+    network = Network()
     
     # Create routers
     router1 = Router("Router1")
@@ -300,28 +411,29 @@ def test_dynamic_routing():
     # Simulate route exchange (would happen over time in a real network)
     # First round - directly connected networks
     print("\n--- Round 1: Initial RIP Updates ---")
-    router2.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-    router3.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-    
-    router1.process_rip_update(router2.name, "10.0.2.0", "255.255.255.0", 1)
-    router1.process_rip_update(router2.name, "10.0.24.0", "255.255.255.0", 1)
-    
-    router1.process_rip_update(router3.name, "10.0.3.0", "255.255.255.0", 1)
-    router1.process_rip_update(router3.name, "10.0.34.0", "255.255.255.0", 1)
-    
-    router2.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
-    router3.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
+    rip2.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
+    rip3.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
+
+    rip1.process_rip_update(router2.name, "10.0.2.0", "255.255.255.0", 1)
+    rip1.process_rip_update(router2.name, "10.0.24.0", "255.255.255.0", 1)
+
+    rip1.process_rip_update(router3.name, "10.0.3.0", "255.255.255.0", 1)
+    rip1.process_rip_update(router3.name, "10.0.34.0", "255.255.255.0", 1)
+
+    rip2.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
+    rip3.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
+
     
     # Second round - propagate routes
     print("\n--- Round 2: Propagating Routes ---")
-    router3.process_rip_update(router1.name, "10.0.2.0", "255.255.255.0", 2)
-    router3.process_rip_update(router1.name, "10.0.24.0", "255.255.255.0", 2)
-    
-    router2.process_rip_update(router1.name, "10.0.3.0", "255.255.255.0", 2)
-    router2.process_rip_update(router1.name, "10.0.34.0", "255.255.255.0", 2)
-    
-    router1.process_rip_update(router2.name, "10.0.4.0", "255.255.255.0", 2)
-    router1.process_rip_update(router3.name, "10.0.4.0", "255.255.255.0", 2)
+    rip3.process_rip_update(router1.name, "10.0.2.0", "255.255.255.0", 2)
+    rip3.process_rip_update(router1.name, "10.0.24.0", "255.255.255.0", 2)
+
+    rip2.process_rip_update(router1.name, "10.0.3.0", "255.255.255.0", 2)
+    rip2.process_rip_update(router1.name, "10.0.34.0", "255.255.255.0", 2)
+
+    rip1.process_rip_update(router2.name, "10.0.4.0", "255.255.255.0", 2)
+    rip1.process_rip_update(router3.name, "10.0.4.0", "255.255.255.0", 2)
     
     # Display routing tables
     router1.print_routing_table()
