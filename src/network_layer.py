@@ -17,8 +17,10 @@ class ARP:
             return self.cache[ip_address]
         
         print(f"ARP request broadcast for {ip_address}")
-        # Simulate network broadcast
+        # sab network ko  broadcast krega
         for device in network.get_all_devices():
+
+            #check karta hai ki device ke paas IP hai ya nahi.-hasattr(device, 'ip_address')
             if hasattr(device, 'ip_address') and device.ip_address == ip_address:
                 self.cache[ip_address] = device.mac_address
                 print(f"ARP reply: {ip_address} is at {device.mac_address}")
@@ -27,6 +29,7 @@ class ARP:
         print(f"No ARP reply received for {ip_address}")
         return None
 
+# ipv4:Network layer (Layer 3) ka ek packet hota hai jo source se destination IP address tak data bhejta hai.
 class IPPacket:
     """IPv4 Packet representation"""
     def __init__(self, src_ip, dest_ip, data, ttl=64):
@@ -34,6 +37,8 @@ class IPPacket:
         self.dest_ip = dest_ip
         self.data = data
         self.ttl = ttl  # Time To Live
+        #ye dec hota hai jab rtr se pass hoa oor 0 too drop
+        #infnt loop se bachne ke liye use krte hai
     
     def __str__(self):
         return f"IP Packet: {self.src_ip} -> {self.dest_ip}, TTL: {self.ttl}, Data: {self.data}"
@@ -42,11 +47,11 @@ class RoutingTableEntry:
     """Entry in a routing table"""
     def __init__(self, network, netmask, next_hop, interface, metric=1, timestamp=None):
         self.network = network  # Destination network
-        self.netmask = netmask  # Subnet mask
+        self.netmask = netmask  # Subnet mask(255.255.255.0)
         self.next_hop = next_hop  # Next hop IP
-        self.interface = interface  # Outgoing interface
+        self.interface = interface  # Outgoing interface(kaunsa nic use krna hai)
         self.metric = metric  # Route cost/metric
-        self.timestamp = timestamp or time.time()  # Time when entry was added/updated
+        self.timestamp = timestamp or time.time()  # kab entry add/update hui,Zaroori hota hai dynamic routing protocols ke liye, jisme old routes expire ho jaate hain.
     
     def __str__(self):
         return f"{self.network}/{self.netmask.count('1')} via {self.next_hop} dev {self.interface} metric {self.metric}"
@@ -55,14 +60,16 @@ class Router:
     """Network layer router implementation"""
     def __init__(self, name):
         self.name = name
-        self.interfaces = {}  # Interface name to (IP, MAC) mapping
+        self.interfaces = {}  # interface ka naam aur uske saath IP aur MAC address rakhe hote
         self.routing_table = []  # List of RoutingTableEntry objects
         self.arp = ARP()  # ARP table
         self.connected_devices = {}  # Interface to device mapping
+        self.ospf = None  # OSPF instance will be initialized separately
     
     def add_interface(self, name, ip_address, mac_address, network=None):
         """Add an interface to the router"""
         # Parse IP with subnet mask (CIDR notation)
+        #ipaddress module use karke subnet aur network details nikaal rahe hain.
         ip_obj = ipaddress.IPv4Interface(ip_address)
         network_addr = str(ip_obj.network.network_address)
         netmask = str(ip_obj.network.netmask)
@@ -73,14 +80,17 @@ class Router:
         # Add a route for directly connected network
         self.add_route(network_addr, netmask, None, name, metric=0)
     
+    #Ye function ek static route routing table me daalta hai.
     def add_route(self, network, netmask, next_hop, interface, metric=1):
         """Add a static route to the routing table"""
         entry = RoutingTableEntry(network, netmask, next_hop, interface, metric)
         self.routing_table.append(entry)
         print(f"Added route: {entry}")
     
+    #Router interface pe koi device connect karta hai
     def connect_device(self, interface_name, device):
         """Connect a device to a router interface"""
+        #agar interface valid hai toh device connect karte hain.
         if interface_name in self.interfaces:
             self.connected_devices[interface_name] = device
             print(f"Connected {device.name} to interface {interface_name}")
@@ -91,7 +101,7 @@ class Router:
         """Find the best route for a destination IP using longest prefix match"""
         best_match = None
         best_prefix_len = -1
-        
+        # String format wali IP address ko ek IPv4Address object mein convert kiya gaya
         dest_ip_obj = ipaddress.IPv4Address(dest_ip)
         
         for entry in self.routing_table:
@@ -155,92 +165,6 @@ class Router:
             print(f"{entry.network}\t\t{entry.netmask}\t\t{entry.next_hop or 'Direct'}\t\t{entry.interface}\t\t{entry.metric}")
         print()
 
-class RIP:
-    """Routing Information Protocol implementation"""
-    def __init__(self, router):
-        self.router = router
-        self.update_interval = 30  # seconds between updates
-        self.route_timeout = 180  # seconds until route expiry
-        self.route_garbage = 120  # seconds until removed after expiry
-        self.max_hops = 15  # infinity in RIP
-    
-    def start(self, network):
-        """Start the RIP protocol"""
-        print(f"Starting RIP on router {self.router.name}")
-        self.network = network
-        self.send_update()
-    
-    def send_update(self):
-        """Send RIP updates to neighboring routers"""
-        print(f"Router {self.router.name} sending RIP updates")
-        
-        # Get all connected routers
-        neighbors = []
-        for interface, device in self.router.connected_devices.items():
-            if isinstance(device, Router):
-                neighbors.append(device)
-        
-        # Send routing table to neighbors
-        for neighbor in neighbors:
-            print(f"Sending RIP update to {neighbor.name}")
-            for route in self.router.routing_table:
-                # Apply split horizon with poisoned reverse
-                if route.next_hop == neighbor.name:
-                    # Set metric to infinity for routes that go through this neighbor
-                    metric = self.max_hops
-                else:
-                    metric = route.metric
-                
-                if hasattr(neighbor, 'process_rip_update'):
-                    neighbor.process_rip_update(self.router.name, route.network, route.netmask, metric)
-    
-    def process_rip_update(self, from_router, network, netmask, metric):
-        """Process a RIP update from another router"""
-        if metric >= self.max_hops:
-            # Ignore routes with metric >= infinity
-            return
-        
-        # Update metric (add 1 for the hop to the advertising router)
-        new_metric = metric + 1
-        if new_metric >= self.max_hops:
-            new_metric = self.max_hops  # Cap at infinity
-        
-        # Find the interface connected to the sending router
-        interface = None
-        for intf, device in self.router.connected_devices.items():
-            if hasattr(device, 'name') and device.name == from_router:
-                interface = intf
-                break
-        
-        if not interface:
-            print(f"Cannot find interface to router {from_router}")
-            return
-        
-        # Check if we already have a route to this network
-        existing_route = None
-        for route in self.router.routing_table:
-            if route.network == network and route.netmask == netmask:
-                existing_route = route
-                break
-        
-        if existing_route:
-            if new_metric < existing_route.metric:
-                # Found a better route
-                existing_route.next_hop = from_router
-                existing_route.interface = interface
-                existing_route.metric = new_metric
-                existing_route.timestamp = time.time()
-                print(f"Updated route to {network}/{netmask.count('1')} via {from_router} with metric {new_metric}")
-            elif existing_route.next_hop == from_router:
-                # Update from current next hop
-                if new_metric != existing_route.metric:
-                    existing_route.metric = new_metric
-                    print(f"Updated metric for {network}/{netmask.count('1')} to {new_metric}")
-                existing_route.timestamp = time.time()  # Refresh timestamp
-        else:
-            # Add a new route
-            self.router.add_route(network, netmask, from_router, interface, new_metric)
-
 class OSPF:
     """Open Shortest Path First protocol implementation"""
     def __init__(self, router, area=0):
@@ -250,6 +174,7 @@ class OSPF:
         self.neighbors = {}  # Router ID to neighbor mapping
         self.lsdb = {}  # Link State Database
         self.spf_tree = {}  # Shortest Path Tree
+        self.router.ospf = self  # Set reference in router
     
     def start(self, network):
         """Start the OSPF protocol"""
@@ -288,16 +213,18 @@ class OSPF:
         # Add links to directly connected networks
         for interface, (ip, _) in self.router.interfaces.items():
             ip_obj = ipaddress.IPv4Interface(ip)
-            network = str(ip_obj.network.network_address)
-            netmask = str(ip_obj.network.netmask)
-            lsa['links'][f"{network}/{netmask}"] = {
+            network_addr = str(ip_obj.network.network_address)
+            prefix_len = ip_obj.network.prefixlen
+            network_cidr = f"{network_addr}/{prefix_len}"
+            
+            lsa['links'][network_cidr] = {
                 'cost': 1,
                 'type': 'network'
             }
         
         # Add links to neighboring routers
         for router_id, neighbor in self.neighbors.items():
-            lsa['links'][router_id] = {
+            lsa['links'][str(router_id)] = {
                 'cost': neighbor['cost'],
                 'type': 'router'
             }
@@ -323,7 +250,8 @@ class OSPF:
             # Flood to other neighbors
             for neighbor_id, neighbor in self.neighbors.items():
                 if neighbor_id != from_router_id:
-                    neighbor['router'].ospf.receive_lsa(lsa, self.router_id)
+                    if hasattr(neighbor['router'], 'ospf'):
+                        neighbor['router'].ospf.receive_lsa(lsa, self.router_id)
             
             # Recalculate routes
             self.calculate_routes()
@@ -332,31 +260,49 @@ class OSPF:
         """Calculate shortest paths using Dijkstra's algorithm"""
         print(f"Router {self.router.name} calculating OSPF routes")
         
+        # Clear existing OSPF routes (keep directly connected routes)
+        self.router.routing_table = [route for route in self.router.routing_table if route.metric == 0]
+        
         # Build graph for Dijkstra's algorithm
         graph = defaultdict(dict)
+        networks = {}  # Store network information
         
         # Add links from all LSAs
         for router_id, lsa in self.lsdb.items():
             for link_id, link_data in lsa['links'].items():
                 if link_data['type'] == 'router':
                     # Router-to-router link
-                    graph[router_id][link_id] = link_data['cost']
-                    graph[link_id][router_id] = link_data['cost']  # Bidirectional
+                    try:
+                        target_router_id = int(link_id)
+                        graph[router_id][target_router_id] = link_data['cost']
+                        graph[target_router_id][router_id] = link_data['cost']  # Bidirectional
+                    except ValueError:
+                        # Skip if link_id is not a valid router ID
+                        continue
                 elif link_data['type'] == 'network':
-                    # Router-to-network link
-                    graph[router_id][link_id] = link_data['cost']
-                    
-                    # Connect all routers on this network
-                    for other_id, other_lsa in self.lsdb.items():
-                        if other_id != router_id:
-                            for other_link, other_data in other_lsa['links'].items():
-                                if other_link == link_id and other_data['type'] == 'network':
-                                    # These routers share a network
-                                    graph[router_id][other_id] = link_data['cost'] + other_data['cost']
+                    # Store network information for route calculation
+                    if '/' in link_id:
+                        network_addr, prefix_len = link_id.split('/')
+                        networks[link_id] = {
+                            'network': network_addr,
+                            'prefix_len': int(prefix_len),
+                            'routers': []
+                        }
+                        if router_id not in networks[link_id]['routers']:
+                            networks[link_id]['routers'].append(router_id)
+        
+        # Connect routers on the same network
+        for network_id, network_info in networks.items():
+            routers_on_network = network_info['routers']
+            for i, router1 in enumerate(routers_on_network):
+                for j, router2 in enumerate(routers_on_network):
+                    if i != j:
+                        # Add edge between routers on same network with cost 1
+                        graph[router1][router2] = 1
         
         # Dijkstra's algorithm
         distances = {self.router_id: 0}
-        previous = {}
+        previous = {} #RASTA ka hisab rakhne ke liye
         nodes = list(graph.keys())
         
         while nodes:
@@ -373,41 +319,52 @@ class OSPF:
                         distances[neighbor] = alt
                         previous[neighbor] = current
         
-        # Build routing table from shortest paths
-        self.router.routing_table = []
-        
-        # Add directly connected networks
-        for interface, (ip, _) in self.router.interfaces.items():
-            ip_obj = ipaddress.IPv4Interface(ip)
-            network = str(ip_obj.network.network_address)
-            netmask = str(ip_obj.network.netmask)
-            self.router.add_route(network, netmask, None, interface, 0)
-        
         # Add routes from SPF calculation
-        for router_id in self.lsdb:
-            if router_id == self.router_id:
+        for target_router_id, distance in distances.items():
+            if target_router_id == self.router_id:
                 continue  # Skip self
             
             # Get path to this router
             path = []
-            current = router_id
+            current = target_router_id
             while current in previous:
                 path.insert(0, current)
                 current = previous[current]
             
-            if path:
+            if path and target_router_id in self.lsdb:
                 next_hop_id = path[0]
+                
                 # Find the interface to this next hop
+                next_hop_router = None
+                interface = None
                 for neighbor_id, neighbor in self.neighbors.items():
                     if neighbor_id == next_hop_id:
+                        next_hop_router = neighbor['router']
                         interface = neighbor['interface']
-                        
-                        # Add routes for networks advertised by this router
-                        for link_id, link_data in self.lsdb[router_id]['links'].items():
-                            if link_data['type'] == 'network':
-                                network, prefix_len = link_id.split('/')
+                        break
+                
+                if next_hop_router and interface:
+                    # Add routes for networks advertised by this router
+                    for link_id, link_data in self.lsdb[target_router_id]['links'].items():
+                        if link_data['type'] == 'network' and '/' in link_id:
+                            try:
+                                network_addr, prefix_len = link_id.split('/')
                                 netmask = self.prefix_to_netmask(int(prefix_len))
-                                self.router.add_route(network, netmask, neighbor['router'].name, interface, distances[router_id])
+                                
+                                # Check if this route already exists (avoid duplicates)
+                                route_exists = False
+                                for existing_route in self.router.routing_table:
+                                    if (existing_route.network == network_addr and 
+                                        existing_route.netmask == netmask):
+                                        route_exists = True
+                                        break
+                                
+                                if not route_exists:
+                                    self.router.add_route(network_addr, netmask, 
+                                                        next_hop_router.name, interface, distance)
+                            except (ValueError, IndexError):
+                                # Skip invalid network entries
+                                continue
     
     def prefix_to_netmask(self, prefix_len):
         """Convert prefix length to netmask string"""
@@ -456,6 +413,7 @@ class NetworkDevice:
             
             # Find the gateway device
             for device in network.get_all_devices():
+                #Gateway ka IP find karo aur forward_packet call karo.
                 if hasattr(device, 'ip_address') and device.ip_address == self.default_gateway:
                     if hasattr(device, 'forward_packet'):
                         print(f"Sending packet to gateway {self.default_gateway}")

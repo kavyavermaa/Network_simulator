@@ -5,7 +5,7 @@ import random
 import ipaddress
 from src.physical_layer import EndDevice, Hub, Connection
 from src.data_link_layer import Switch, Device, parity_check, csma_cd, sliding_window
-from src.network_layer import Router, NetworkDevice, IPPacket, ARP, RIP, OSPF
+from src.network_layer import Router, NetworkDevice, IPPacket, ARP, OSPF
 
 class Network:
     """Network class to manage all devices"""
@@ -141,7 +141,7 @@ def test_network_layer():
     network.add_device(router2)
     network.add_device(router3)
     
-    # Create network devices (hosts)
+    # Create network devices (hosts) and harr host ka nam and mac add.
     host1 = NetworkDevice("Host1", "AA:BB:CC:11:11:11")
     host2 = NetworkDevice("Host2", "AA:BB:CC:22:22:22")
     host3 = NetworkDevice("Host3", "AA:BB:CC:33:33:33")
@@ -166,7 +166,7 @@ def test_network_layer():
     router3.add_interface("eth0", "192.168.1.2/24", "AA:BB:CC:03:03:01")
     router3.add_interface("eth1", "192.168.3.1/24", "AA:BB:CC:03:03:02")
     
-    # Configure hosts
+    # Configure hosts with proper IP addresses including subnet mask
     host1.set_ip("192.168.1.10/24", "192.168.1.1")
     host2.set_ip("192.168.1.11/24", "192.168.1.1")
     host3.set_ip("192.168.2.10/24", "192.168.2.1")
@@ -174,9 +174,10 @@ def test_network_layer():
     host5.set_ip("192.168.3.10/24", "192.168.3.1")
     host6.set_ip("192.168.3.11/24", "192.168.3.1")
     
-    # Connect devices to routers
+    # Connect devices to routers (simulating physical connections)
     router1.connect_device("eth0", host1)
     router1.connect_device("eth0", host2)
+    router1.connect_device("eth0", router3)  # Router3 is also on this network
     router1.connect_device("eth1", router2)
     
     router2.connect_device("eth0", router1)
@@ -184,18 +185,20 @@ def test_network_layer():
     router2.connect_device("eth1", host4)
     
     router3.connect_device("eth0", router1)
+    router3.connect_device("eth0", host1)  
+    router3.connect_device("eth0", host2) 
     router3.connect_device("eth1", host5)
     router3.connect_device("eth1", host6)
     
-    # Add static routes
-    router1.add_route("192.168.2.0", "255.255.255.0", "10.0.0.2", "eth1")
-    router1.add_route("192.168.3.0", "255.255.255.0", "192.168.1.2", "eth0")
+    # Add static routes for inter-network communication
+    router1.add_route("192.168.2.0", "255.255.255.0", "Router2", "eth1")
+    router1.add_route("192.168.3.0", "255.255.255.0", "Router3", "eth0")
     
-    router2.add_route("192.168.1.0", "255.255.255.0", "10.0.0.1", "eth0")
-    router2.add_route("192.168.3.0", "255.255.255.0", "10.0.0.1", "eth0")
+    router2.add_route("192.168.1.0", "255.255.255.0", "Router1", "eth0")
+    router2.add_route("192.168.3.0", "255.255.255.0", "Router1", "eth0")
     
-    router3.add_route("192.168.2.0", "255.255.255.0", "192.168.1.1", "eth0")
-    router3.add_route("10.0.0.0", "255.255.255.0", "192.168.1.1", "eth0")
+    router3.add_route("192.168.2.0", "255.255.255.0", "Router1", "eth0")
+    router3.add_route("10.0.0.0", "255.255.255.0", "Router1", "eth0")
     
     # Display routing tables
     router1.print_routing_table()
@@ -216,6 +219,10 @@ def test_network_layer():
     # Host2 sends data to Host5 (across routers)
     host2.send_packet("192.168.3.10", "Hello from Host2 to Host5", network)
     
+    # Test local network communication
+    print("\n--- Testing Local Network Communication ---")
+    host1.send_packet("192.168.1.11", "Hello from Host1 to Host2 (same network)", network)
+    
     # Visualize network
     devices = [router1, router2, router3, host1, host2, host3, host4, host5, host6]
     connections = [
@@ -227,234 +234,238 @@ def test_network_layer():
     
     print("Network Layer Static Routing Test Completed")
 
-def test_dynamic_routing():
-    print("\n--- Testing Dynamic Routing (RIP) ---")
+def test_ospf_routing():
+    print("\n--- Testing OSPF Dynamic Routing ---")
     network = Network()
-
+    
     # Create routers
     router1 = Router("Router1")
     router2 = Router("Router2")
     router3 = Router("Router3")
     router4 = Router("Router4")
-
+    
     network.add_device(router1)
     network.add_device(router2)
     network.add_device(router3)
     network.add_device(router4)
-
+    
     # Create hosts
     host1 = NetworkDevice("Host1", "AA:BB:CC:11:11:11")
     host2 = NetworkDevice("Host2", "AA:BB:CC:22:22:22")
-
+    host3 = NetworkDevice("Host3", "AA:BB:CC:33:33:33")
+    host4 = NetworkDevice("Host4", "AA:BB:CC:44:44:44")
+    
     network.add_device(host1)
     network.add_device(host2)
-
-    # Configure router interfaces
-    router1.add_interface("eth0", "10.0.1.1/24", "AA:BB:CC:01:01:01")
-    router1.add_interface("eth1", "10.0.12.1/24", "AA:BB:CC:01:01:02")
-    router1.add_interface("eth2", "10.0.13.1/24", "AA:BB:CC:01:01:03")
-
-    router2.add_interface("eth0", "10.0.12.2/24", "AA:BB:CC:02:02:01")
-    router2.add_interface("eth1", "10.0.2.1/24", "AA:BB:CC:02:02:02")
-    router2.add_interface("eth2", "10.0.24.1/24", "AA:BB:CC:02:02:03")
-
-    router3.add_interface("eth0", "10.0.13.3/24", "AA:BB:CC:03:03:01")
-    router3.add_interface("eth1", "10.0.3.1/24", "AA:BB:CC:03:03:02")
-    router3.add_interface("eth2", "10.0.34.1/24", "AA:BB:CC:03:03:03")
-
-    router4.add_interface("eth0", "10.0.24.4/24", "AA:BB:CC:04:04:01")
-    router4.add_interface("eth1", "10.0.34.4/24", "AA:BB:CC:04:04:02")
-    router4.add_interface("eth2", "10.0.4.1/24", "AA:BB:CC:04:04:03")
-
+    network.add_device(host3)
+    network.add_device(host4)
+    
+    # Configure router interfaces for OSPF topology
+    router1.add_interface("eth0", "10.0.1.1/24", "AA:BB:CC:01:01:01")      # Host network
+    router1.add_interface("eth1", "10.0.12.1/24", "AA:BB:CC:01:01:02")     # To Router2
+    router1.add_interface("eth2", "10.0.13.1/24", "AA:BB:CC:01:01:03")     # To Router3
+    
+    router2.add_interface("eth0", "10.0.12.2/24", "AA:BB:CC:02:02:01")     # To Router1
+    router2.add_interface("eth1", "10.0.2.1/24", "AA:BB:CC:02:02:02")      # Host network
+    router2.add_interface("eth2", "10.0.24.1/24", "AA:BB:CC:02:02:03")     # To Router4
+    
+    router3.add_interface("eth0", "10.0.13.2/24", "AA:BB:CC:03:03:01")     # To Router1
+    router3.add_interface("eth1", "10.0.3.1/24", "AA:BB:CC:03:03:02")      # Host network
+    router3.add_interface("eth2", "10.0.34.1/24", "AA:BB:CC:03:03:03")     # To Router4
+    
+    router4.add_interface("eth0", "10.0.24.2/24", "AA:BB:CC:04:04:01")     # To Router2
+    router4.add_interface("eth1", "10.0.34.2/24", "AA:BB:CC:04:04:02")     # To Router3
+    router4.add_interface("eth2", "10.0.4.1/24", "AA:BB:CC:04:04:03")      # Host network
+    
     # Configure hosts
     host1.set_ip("10.0.1.10/24", "10.0.1.1")
-    host2.set_ip("10.0.4.10/24", "10.0.4.1")
-
+    host2.set_ip("10.0.2.10/24", "10.0.2.1")
+    host3.set_ip("10.0.3.10/24", "10.0.3.1")
+    host4.set_ip("10.0.4.10/24", "10.0.4.1")
+    
     # Connect devices to routers
     router1.connect_device("eth0", host1)
     router1.connect_device("eth1", router2)
     router1.connect_device("eth2", router3)
-
+    
     router2.connect_device("eth0", router1)
+    router2.connect_device("eth1", host2)
     router2.connect_device("eth2", router4)
-
+    
     router3.connect_device("eth0", router1)
+    router3.connect_device("eth1", host3)
     router3.connect_device("eth2", router4)
-
+    
     router4.connect_device("eth0", router2)
     router4.connect_device("eth1", router3)
-    router4.connect_device("eth2", host2)
-
-    # Initialize RIP on routers
-    rip1 = RIP(router1)
-    rip2 = RIP(router2)
-    rip3 = RIP(router3)
-    rip4 = RIP(router4)
-
-    # Start RIP
-    rip1.start(network)
-    rip2.start(network)
-    rip3.start(network)
-    rip4.start(network)
-
-    # Simulate route exchange
-    print("\n--- Round 1: Initial RIP Updates ---")
-    rip2.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-    rip3.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-
-    rip1.process_rip_update(router2.name, "10.0.2.0", "255.255.255.0", 1)
-    rip1.process_rip_update(router2.name, "10.0.24.0", "255.255.255.0", 1)
-
-    rip1.process_rip_update(router3.name, "10.0.3.0", "255.255.255.0", 1)
-    rip1.process_rip_update(router3.name, "10.0.34.0", "255.255.255.0", 1)
-
-    rip2.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
-    rip3.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
-
-    print("\n--- Round 2: Propagating Routes ---")
-    rip3.process_rip_update(router1.name, "10.0.2.0", "255.255.255.0", 2)
-    rip3.process_rip_update(router1.name, "10.0.24.0", "255.255.255.0", 2)
-
-    rip2.process_rip_update(router1.name, "10.0.3.0", "255.255.255.0", 2)
-    rip2.process_rip_update(router1.name, "10.0.34.0", "255.255.255.0", 2)
-
-    rip1.process_rip_update(router2.name, "10.0.4.0", "255.255.255.0", 2)
-    rip1.process_rip_update(router3.name, "10.0.4.0", "255.255.255.0", 2)
-
-    # Display routing tables
+    router4.connect_device("eth2", host4)
+    
+    # Initialize OSPF on all routers
+    ospf1 = OSPF(router1, area=0)
+    ospf2 = OSPF(router2, area=0)
+    ospf3 = OSPF(router3, area=0)
+    ospf4 = OSPF(router4, area=0)
+    
+    # Start OSPF protocol
+    print("\n--- Starting OSPF Protocol ---")
+    ospf1.start(network)
+    ospf2.start(network)
+    ospf3.start(network)
+    ospf4.start(network)
+    
+    # Display routing tables after OSPF convergence
+    print("\n--- Routing Tables After OSPF Convergence ---")
     router1.print_routing_table()
     router2.print_routing_table()
     router3.print_routing_table()
     router4.print_routing_table()
-
-    print("\n--- Testing Packet Forwarding with RIP ---")
-    host1.send_packet("10.0.4.10", "Hello from Host1 to Host2 via RIP routes", network)
-
-    # Visualization
-    devices = [router1, router2, router3, router4, host1, host2]
+    
+    # Test packet forwarding with OSPF routes
+    print("\n--- Testing Packet Forwarding with OSPF ---")
+    host1.send_packet("10.0.4.10", "Hello from Host1 to Host4 via OSPF routes", network)
+    host2.send_packet("10.0.3.10", "Hello from Host2 to Host3 via OSPF routes", network)
+    
+    # Visualize OSPF network
+    devices = [router1, router2, router3, router4, host1, host2, host3, host4]
     connections = [
         (router1, host1), (router1, router2), (router1, router3),
-        (router2, router4), (router3, router4), (router4, host2)
+        (router2, host2), (router2, router4),
+        (router3, host3), (router3, router4),
+        (router4, host4)
     ]
-    visualize_network(devices, connections, "Network Layer: RIP Dynamic Routing")
-    print("Network Layer RIP Dynamic Routing Test Completed")
+    visualize_network(devices, connections, "Network Layer: OSPF Dynamic Routing")
+    
+    print("OSPF Dynamic Routing Test Completed")
 
-    print("\n--- Testing Dynamic Routing (RIP) ---")
+def test_advanced_scenarios():
+    print("\n--- Testing Advanced Network Scenarios ---")
     network = Network()
     
-    # Create routers
-    router1 = Router("Router1")
-    router2 = Router("Router2")
-    router3 = Router("Router3")
-    router4 = Router("Router4")
+    # Create a more complex topology
+    routers = []
+    for i in range(5):
+        router = Router(f"Router{i+1}")
+        routers.append(router)
+        network.add_device(router)
     
-    network.add_device(router1)
-    network.add_device(router2)
-    network.add_device(router3)
-    network.add_device(router4)
+    hosts = []
+    for i in range(6):
+        host = NetworkDevice(f"Host{i+1}", f"AA:BB:CC:DD:EE:{i+1:02d}")
+        hosts.append(host)
+        network.add_device(host)
     
-    # Create network devices (hosts)
-    host1 = NetworkDevice("Host1", "AA:BB:CC:11:11:11")
-    host2 = NetworkDevice("Host2", "AA:BB:CC:22:22:22")
+    # Configure a complex network topology
+    #Ye comment hai jo batata hai ki ab hum network ki structure set karenge, matlab kaunse router kaunsa IP address use karega, aur kaunse devices connected hain.
+    # Router1: Central hub
+    routers[0].add_interface("eth0", "192.168.1.1/24", "AA:BB:CC:01:01:01")  # Hosts
+    routers[0].add_interface("eth1", "10.0.12.1/24", "AA:BB:CC:01:01:02")    # To Router2
+    routers[0].add_interface("eth2", "10.0.13.1/24", "AA:BB:CC:01:01:03")    # To Router3
+    routers[0].add_interface("eth3", "10.0.14.1/24", "AA:BB:CC:01:01:04")    # To Router4
     
-    network.add_device(host1)
-    network.add_device(host2)
+    # Router2: Branch office
+    routers[1].add_interface("eth0", "10.0.12.2/24", "AA:BB:CC:02:02:01")    # To Router1
+    routers[1].add_interface("eth1", "192.168.2.1/24", "AA:BB:CC:02:02:02")  # Hosts
+    routers[1].add_interface("eth2", "10.0.25.1/24", "AA:BB:CC:02:02:03")    # To Router5
     
-    # Configure router interfaces
-    router1.add_interface("eth0", "10.0.1.1/24", "AA:BB:CC:01:01:01")
-    router1.add_interface("eth1", "10.0.12.1/24", "AA:BB:CC:01:01:02")
-    router1.add_interface("eth2", "10.0.13.1/24", "AA:BB:CC:01:01:03")
+    # Router3: Another branch
+    routers[2].add_interface("eth0", "10.0.13.2/24", "AA:BB:CC:03:03:01")    # To Router1
+    routers[2].add_interface("eth1", "192.168.3.1/24", "AA:BB:CC:03:03:02")  # Hosts
     
-    router2.add_interface("eth0", "10.0.12.2/24", "AA:BB:CC:02:02:01")
-    router2.add_interface("eth1", "10.0.2.1/24", "AA:BB:CC:02:02:02")
-    router2.add_interface("eth2", "10.0.24.1/24", "AA:BB:CC:02:02:03")
+    # Router4: Backup path
+    routers[3].add_interface("eth0", "10.0.14.2/24", "AA:BB:CC:04:04:01")    # To Router1
+    routers[3].add_interface("eth1", "10.0.45.1/24", "AA:BB:CC:04:04:02")    # To Router5
     
-    router3.add_interface("eth0", "10.0.13.3/24", "AA:BB:CC:03:03:01")
-    router3.add_interface("eth1", "10.0.3.1/24", "AA:BB:CC:03:03:02")
-    router3.add_interface("eth2", "10.0.34.1/24", "AA:BB:CC:03:03:03")
-    
-    router4.add_interface("eth0", "10.0.24.4/24", "AA:BB:CC:04:04:01")
-    router4.add_interface("eth1", "10.0.34.4/24", "AA:BB:CC:04:04:02")
-    router4.add_interface("eth2", "10.0.4.1/24", "AA:BB:CC:04:04:03")
+    # Router5: Remote office
+    routers[4].add_interface("eth0", "10.0.25.2/24", "AA:BB:CC:05:05:01")    # To Router2
+    routers[4].add_interface("eth1", "10.0.45.2/24", "AA:BB:CC:05:05:02")    # To Router4
+    routers[4].add_interface("eth2", "192.168.5.1/24", "AA:BB:CC:05:05:03")  # Hosts
     
     # Configure hosts
-    host1.set_ip("10.0.1.10/24", "10.0.1.1")
-    host2.set_ip("10.0.4.10/24", "10.0.4.1")
+    hosts[0].set_ip("192.168.1.10/24", "192.168.1.1")  # Connected to Router1
+    hosts[1].set_ip("192.168.1.11/24", "192.168.1.1")  # Connected to Router1
+    hosts[2].set_ip("192.168.2.10/24", "192.168.2.1")  # Connected to Router2
+    hosts[3].set_ip("192.168.3.10/24", "192.168.3.1")  # Connected to Router3
+    hosts[4].set_ip("192.168.5.10/24", "192.168.5.1")  # Connected to Router5
+    hosts[5].set_ip("192.168.5.11/24", "192.168.5.1")  # Connected to Router5
     
-    # Connect devices to routers
-    router1.connect_device("eth0", host1)
-    router1.connect_device("eth1", router2)
-    router1.connect_device("eth2", router3)
+    # Connect devices
+    routers[0].connect_device("eth0", hosts[0])
+    routers[0].connect_device("eth0", hosts[1])
+    routers[0].connect_device("eth1", routers[1])
+    routers[0].connect_device("eth2", routers[2])
+    routers[0].connect_device("eth3", routers[3])
     
-    router2.connect_device("eth0", router1)
-    router2.connect_device("eth2", router4)
+    routers[1].connect_device("eth0", routers[0])
+    routers[1].connect_device("eth1", hosts[2])
+    routers[1].connect_device("eth2", routers[4])
     
-    router3.connect_device("eth0", router1)
-    router3.connect_device("eth2", router4)
+    routers[2].connect_device("eth0", routers[0])
+    routers[2].connect_device("eth1", hosts[3])
     
-    router4.connect_device("eth0", router2)
-    router4.connect_device("eth1", router3)
-    router4.connect_device("eth2", host2)
+    routers[3].connect_device("eth0", routers[0])
+    routers[3].connect_device("eth1", routers[4])
     
-    # Initialize RIP on routers
-    router1_rip = RIP(router1)
-    router2_rip = RIP(router2)
-    router3_rip = RIP(router3)
-    router4_rip = RIP(router4)
+    routers[4].connect_device("eth0", routers[1])
+    routers[4].connect_device("eth1", routers[3])
+    routers[4].connect_device("eth2", hosts[4])
+    routers[4].connect_device("eth2", hosts[5])
     
-    # Start RIP protocol
-    router1_rip.start(network)
-    router2_rip.start(network)
-    router3_rip.start(network)
-    router4_rip.start(network)
+    # Add static routes for this complex topology
+    # Router1 routes
+    routers[0].add_route("192.168.2.0", "255.255.255.0", "Router2", "eth1")
+    routers[0].add_route("192.168.3.0", "255.255.255.0", "Router3", "eth2")
+    routers[0].add_route("192.168.5.0", "255.255.255.0", "Router2", "eth1")  # Via Router2
     
-    # Simulate route exchange (would happen over time in a real network)
-    # First round - directly connected networks
-    print("\n--- Round 1: Initial RIP Updates ---")
-    rip2.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-    rip3.process_rip_update(router1.name, "10.0.1.0", "255.255.255.0", 1)
-
-    rip1.process_rip_update(router2.name, "10.0.2.0", "255.255.255.0", 1)
-    rip1.process_rip_update(router2.name, "10.0.24.0", "255.255.255.0", 1)
-
-    rip1.process_rip_update(router3.name, "10.0.3.0", "255.255.255.0", 1)
-    rip1.process_rip_update(router3.name, "10.0.34.0", "255.255.255.0", 1)
-
-    rip2.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
-    rip3.process_rip_update(router4.name, "10.0.4.0", "255.255.255.0", 1)
-
+    # Router2 routes
+    routers[1].add_route("192.168.1.0", "255.255.255.0", "Router1", "eth0")
+    routers[1].add_route("192.168.3.0", "255.255.255.0", "Router1", "eth0")
+    routers[1].add_route("192.168.5.0", "255.255.255.0", "Router5", "eth2")
     
-    # Second round - propagate routes
-    print("\n--- Round 2: Propagating Routes ---")
-    rip3.process_rip_update(router1.name, "10.0.2.0", "255.255.255.0", 2)
-    rip3.process_rip_update(router1.name, "10.0.24.0", "255.255.255.0", 2)
-
-    rip2.process_rip_update(router1.name, "10.0.3.0", "255.255.255.0", 2)
-    rip2.process_rip_update(router1.name, "10.0.34.0", "255.255.255.0", 2)
-
-    rip1.process_rip_update(router2.name, "10.0.4.0", "255.255.255.0", 2)
-    rip1.process_rip_update(router3.name, "10.0.4.0", "255.255.255.0", 2)
+    # Router3 routes
+    routers[2].add_route("192.168.1.0", "255.255.255.0", "Router1", "eth0")
+    routers[2].add_route("192.168.2.0", "255.255.255.0", "Router1", "eth0")
+    routers[2].add_route("192.168.5.0", "255.255.255.0", "Router1", "eth0")
     
-    # Display routing tables
-    router1.print_routing_table()
-    router2.print_routing_table()
-    router3.print_routing_table()
-    router4.print_routing_table()
+    # Router4 routes
+    routers[3].add_route("192.168.1.0", "255.255.255.0", "Router1", "eth0")
+    routers[3].add_route("192.168.2.0", "255.255.255.0", "Router1", "eth0")
+    routers[3].add_route("192.168.3.0", "255.255.255.0", "Router1", "eth0")
+    routers[3].add_route("192.168.5.0", "255.255.255.0", "Router5", "eth1")
     
-    # Test packet forwarding
-    print("\n--- Testing Packet Forwarding with RIP ---")
-    # Host1 sends data to Host2 (across multiple routers)
-    host1.send_packet("10.0.4.10", "Hello from Host1 to Host2 via RIP routes", network)
+    # Router5 routes
+    routers[4].add_route("192.168.1.0", "255.255.255.0", "Router2", "eth0")
+    routers[4].add_route("192.168.2.0", "255.255.255.0", "Router2", "eth0")
+    routers[4].add_route("192.168.3.0", "255.255.255.0", "Router2", "eth0")
     
-    # Visualize network
-    devices = [router1, router2, router3, router4, host1, host2]
+    # Display all routing tables
+    print("\n--- Complex Network Routing Tables ---")
+    for router in routers:
+        router.print_routing_table()
+    
+    # Test various communication scenarios
+    print("\n--- Testing Complex Network Communication ---")
+    hosts[0].send_packet("192.168.5.10", "Message from Host1 to Host5", network)
+    hosts[2].send_packet("192.168.3.10", "Message from Host3 to Host4", network)
+    hosts[4].send_packet("192.168.1.11", "Message from Host5 to Host2", network)
+    
+    # Test TTL expiration
+    print("\n--- Testing TTL Expiration ---")
+    packet = IPPacket("192.168.1.10", "192.168.5.10", "Test TTL", ttl=1)
+    routers[0].forward_packet(packet)
+    
+    # Visualize complex network
+    devices = routers + hosts
     connections = [
-        (router1, host1), (router1, router2), (router1, router3),
-        (router2, router4), (router3, router4), (router4, host2)
+        (routers[0], hosts[0]), (routers[0], hosts[1]),
+        (routers[0], routers[1]), (routers[0], routers[2]), (routers[0], routers[3]),
+        (routers[1], hosts[2]), (routers[1], routers[4]),
+        (routers[2], hosts[3]),
+        (routers[3], routers[4]),
+        (routers[4], hosts[4]), (routers[4], hosts[5])
     ]
-    visualize_network(devices, connections, "Network Layer: RIP Dynamic Routing")
+    visualize_network(devices, connections, "Advanced Network Scenarios")
     
-    print("Network Layer RIP Dynamic Routing Test Completed")
+    print("Advanced Network Scenarios Test Completed")
 
 def main():
     print("Network Simulator")
@@ -464,7 +475,8 @@ def main():
     # test_physical_layer()
     # test_data_link_layer()
     test_network_layer()
-    test_dynamic_routing()
+    test_ospf_routing()
+    test_advanced_scenarios()
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,33 @@
+def test_transport_and_application_layer():
+    print("\n--- [Layer 4] TRANSPORT & APPLICATION LAYER TEST ---")
+
+    # Initialize port manager for assigning ports to processes
+    port_manager = PortManager()
+
+    # ---------------- Chat Application Test ---------------- #
+    print("\n[Application Test 1] ChatApp: Simulating reliable message transfer")
+
+    chat_client = ChatApp("ChatClient")        # Sender
+    chat_server = ChatApp("ChatServer")        # Receiver
+
+    sliding_window_transport(
+        sender_app=chat_client,
+        receiver_app=chat_server,
+        message="HelloChat",                   # Message to send
+        port_manager=port_manager,
+        window_size=3                          # Go-Back-N window size
+    )
+
+    # ---------------- FTP Application Test ---------------- #
+    print("\n[Application Test 2] FTPMock: Simulating file upload stream")
+
+    ftp_client = FTPMock("FTPClient")          # Sender
+    ftp_server = FTPMock("FTPServer")          # Receiver
+
+    sliding_window_transport(
+        sender_app=ftp_client,
+        receiver_app=ftp_server,
+        message="uploadedfile",                # Simulated file data
+        port_manager=port_manager,
+        window_size=4                          # Larger window for FTP
+    )
